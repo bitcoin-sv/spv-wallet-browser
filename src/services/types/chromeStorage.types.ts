@@ -80,6 +80,7 @@ export interface ChromeStorageObject {
   generateTaggedKeysRequest?: TaggedDerivationRequest;
   encryptRequest?: EncryptRequest;
   decryptRequest?: DecryptRequest;
+  currentPage?: string;
 }
 
 export type CurrentAccountObject = Omit<

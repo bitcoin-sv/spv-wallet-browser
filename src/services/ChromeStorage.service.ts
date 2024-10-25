@@ -338,4 +338,13 @@ export class ChromeStorageService {
     await this.update({ selectedAccount: identityAddress });
     sendMessage({ action: YoursEventName.SWITCH_ACCOUNT });
   };
+
+  getCurrentPage = async (): Promise<string> => {
+    const result = await this.get(['currentPage']);
+    return result.currentPage || 'main';
+  };
+
+  setCurrentPage = async (page: string): Promise<void> => {
+    await this.set({ currentPage: page });
+  };
 }
