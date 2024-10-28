@@ -151,6 +151,72 @@ if (isInServiceWorker) {
     return await verifyAccess(params.domain);
   };
 
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'NEW_TRANSACTION') {
+      const transactionDetails = `Transaction of ${message.amount} ${message.currency} confirmed at ${message.time}`;
+
+      addNotification(transactionDetails)
+        .then(() => sendResponse({ status: 'Notification added' }))
+        .catch((error) => {
+          console.error('Error adding notification:', error);
+          sendResponse({ status: 'Failed to add notification', error });
+        });
+
+      return true;
+    }
+  });
+
+  const addNotification = async (notification: string): Promise<void> => {
+    try {
+      const result = await new Promise<{ notifications: string[] }>((resolve, reject) => {
+        chrome.storage.local.get('notifications', (result) => {
+          if (chrome.runtime.lastError) {
+            return reject(chrome.runtime.lastError);
+          }
+          resolve({ notifications: result.notifications || [] });
+        });
+      });
+
+      const notifications = result.notifications || [];
+
+      notifications.push(notification);
+
+      await new Promise<void>((resolve, reject) => {
+        chrome.storage.local.set({ notifications }, () => {
+          if (chrome.runtime.lastError) {
+            return reject(chrome.runtime.lastError);
+          }
+          resolve();
+        });
+      });
+
+      console.log('Notification added:', notification);
+    } catch (error) {
+      console.error('Failed to add notification:', error);
+      throw error;
+    }
+  };
+
+  const listenForTransactions = () => {
+    setInterval(() => {
+      const newTransaction = {
+        amount: '0.1',
+        currency: 'BTC',
+        time: new Date().toLocaleTimeString(),
+      };
+
+      // Send message to add notification
+      chrome.runtime.sendMessage({
+        type: 'NEW_TRANSACTION',
+        amount: newTransaction.amount,
+        currency: newTransaction.currency,
+        time: newTransaction.time,
+      });
+    }, 5000); // Simulating polling every 5 seconds
+  };
+
+  listenForTransactions();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
     if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {

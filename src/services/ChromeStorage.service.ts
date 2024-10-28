@@ -338,4 +338,21 @@ export class ChromeStorageService {
     await this.update({ selectedAccount: identityAddress });
     sendMessage({ action: YoursEventName.SWITCH_ACCOUNT });
   };
+
+  async addNotification(notification: Notification) {
+    const result = await chrome.storage.local.get('notifications');
+    const notifications = result.notifications || [];
+
+    // Limit the number of notifications
+    if (notifications.length >= 50) {
+      notifications.shift(); // Remove the oldest notification
+    }
+
+    notifications.push(notification);
+    await chrome.storage.local.set({ notifications });
+  }
+
+  clearNotifications() {
+    chrome.storage.local.set({ notifications: [] });
+  }
 }

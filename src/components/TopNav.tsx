@@ -9,6 +9,7 @@ import gitHubIcon from '../assets/github.svg';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
 import copyIcon from '../assets/copy.svg';
+import notificationIcon from '../assets/notification.svg';
 import switchIcon from '../assets/chevrons.svg';
 import { WhiteLabelTheme } from '../theme.types';
 import { useNavigate } from 'react-router-dom';
@@ -47,7 +48,7 @@ const Circle = styled.img`
 const Dropdown = styled.div<WhiteLabelTheme>`
   position: absolute;
   top: 3.5rem;
-  left: 5rem;
+  right: 0;
   color: ${({ theme }) => theme.color.global.contrast};
   background: ${({ theme }) => theme.color.global.row + '90'};
   backdrop-filter: blur(10px);
@@ -111,6 +112,67 @@ const FlexContainer = styled.div`
   align-items: center;
 `;
 
+const NotificationsDropdown = styled.div<WhiteLabelTheme>`
+  position: absolute;
+  top: 3.5rem;
+  right: 1rem;
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
+  color: ${({ theme }) => theme.color.global.contrast};
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 12;
+  width: 18rem;
+  padding: 1rem;
+
+  h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: ${({ theme }) => theme.color.global.contrast};
+  }
+
+  ul {
+    margin: 1rem 0;
+    padding: 0;
+    list-style-type: none;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  li {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: ${({ theme }) => theme.color.global.gray + '20'};
+    border-radius: 0.25rem;
+  }
+
+  button {
+    background-color: ${({ theme }) => theme.color.global.gray};
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    width: 100%;
+    font-size: 0.85rem;
+
+    &:hover {
+      background-color: ${({ theme }) => theme.color.global.neutral};
+    }
+  }
+`;
+
+const NotificationBubble = styled.span`
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: red;
+  color: white;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-weight: bold;
+`;
+
 export const TopNav = () => {
   const { theme } = useTheme();
   const { chromeStorageService } = useServiceContext();
@@ -121,6 +183,31 @@ export const TopNav = () => {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const toggleRef = useRef<HTMLDivElement | null>(null);
   const accountObj = chromeStorageService.getCurrentAccountObject();
+  const [notifications, setNotifications] = useState<string[]>([]); // Store notifications
+  const [showDropdown, setShowDropdown] = useState(false); // Toggle dropdown visibility
+  const [unreadCount, setUnreadCount] = useState(0); // Track number of unread notifications
+
+  // Fetch notifications from chrome storage
+  useEffect(() => {
+    chrome.storage.local.get(['notifications'], (result) => {
+      if (result.notifications) {
+        setNotifications(result.notifications);
+        setUnreadCount(result.notifications.length);
+      }
+    });
+  }, []);
+
+  // Toggle the dropdown menu
+  const toggleDropdown = () => {
+    setShowDropdown(!showDropdown);
+  };
+
+  // Clear all notifications
+  const clearNotifications = () => {
+    setNotifications([]);
+    setUnreadCount(0);
+    chrome.storage.local.set({ notifications: [] }); // Clear from chrome storage
+  };
 
   const handleCopyToClipboard = (bsvAddress: string) => {
     navigator.clipboard.writeText(bsvAddress).then(() => {
@@ -132,11 +219,6 @@ export const TopNav = () => {
     await chromeStorageService.switchAccount(identityAddress);
     setDropdownVisible(false);
     navigate('/bsv-wallet?reload=true');
-  };
-
-  const toggleDropdown = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    setDropdownVisible((prev) => !prev);
   };
 
   const handleClickOutside = (event: MouseEvent) => {
@@ -187,44 +269,27 @@ export const TopNav = () => {
           </Text>
           <SwitchIcon src={switchIcon} onClick={toggleDropdown} />
         </FlexContainer>
-        {dropdownVisible && (
-          <Dropdown theme={theme} ref={dropdownRef}>
-            {chromeStorageService.getAllAccounts().map((account) => (
-              <DropdownItem
-                key={account.addresses.identityAddress}
-                theme={theme}
-                onClick={() => handleSwitchAccount(account.addresses.identityAddress)}
-              >
-                <FlexContainer>
-                  <DropDownIcon src={account.icon} />
-                  <DropDownAccountName style={{ textAlign: 'left' }} theme={theme}>
-                    {account.name}
-                  </DropDownAccountName>
-                </FlexContainer>
-                <FlexContainer>
-                  <DropdownAddressText theme={theme}>
-                    {truncate(account.addresses.bsvAddress, 3, 3)}
-                  </DropdownAddressText>
-                  <CopyIcon
-                    src={copyIcon}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopyToClipboard(account.addresses.bsvAddress);
-                    }}
-                  />
-                </FlexContainer>
-              </DropdownItem>
-            ))}
-            <DropdownItem key={'new-account'} theme={theme} onClick={() => handleSelect('settings', 'manage-accounts')}>
-              <FlexContainer>
-                <DropDownAccountName style={{ textAlign: 'left' }} theme={theme}>
-                  + Add New Account
-                </DropDownAccountName>
-              </FlexContainer>
-            </DropdownItem>
-          </Dropdown>
-        )}
       </LogoWrapper>
+
+      <FlexContainer>
+        <GithubIcon style={{ marginLeft: '1.2rem' }} src={notificationIcon} onClick={toggleDropdown} />
+        {unreadCount > 0 && <NotificationBubble>{unreadCount}</NotificationBubble>}
+      </FlexContainer>
+
+      {showDropdown && (
+        <NotificationsDropdown theme={theme}>
+          <h4>Notifications</h4>
+          <ul>
+            {notifications.length > 0 ? (
+              notifications.map((notification, index) => <li key={index}>{notification}</li>)
+            ) : (
+              <li>No new notifications</li>
+            )}
+          </ul>
+          {notifications.length > 0 && <button onClick={clearNotifications}>Clear All</button>}
+        </NotificationsDropdown>
+      )}
+
       <GithubIcon
         style={{ marginRight: '1.5rem' }}
         src={gitHubIcon}
