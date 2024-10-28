@@ -341,7 +341,7 @@ export class ChromeStorageService {
 
   getCurrentPage = async (): Promise<string> => {
     const result = await this.get(['currentPage']);
-    return result.currentPage || 'main';
+    return result.currentPage || 'bsv-wallet';
   };
 
   setCurrentPage = async (page: string): Promise<void> => {

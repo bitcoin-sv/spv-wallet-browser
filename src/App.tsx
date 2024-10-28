@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { useContext, useEffect, useState } from 'react';
-import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { MemoryRouter as Router, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
@@ -30,7 +30,6 @@ import { Settings } from './pages/Settings';
 import { WhiteLabelTheme } from './theme.types';
 import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
-import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
 import { QueueProvider } from './contexts/QueueContext';
 import { QueueBanner } from './components/QueueBanner';
@@ -38,6 +37,7 @@ import { BlockHeightProvider } from './contexts/BlockHeightContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 import { Bsv20SendRequest } from './pages/requests/Bsv20SendRequest';
+import { useServiceContext } from './hooks/useServiceContext';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
@@ -60,11 +60,15 @@ const Container = styled.div<WhiteLabelTheme>`
   position: relative;
 `;
 
-export const App = () => {
+const AppContent = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { isMobile } = useViewport();
   const { theme } = useTheme();
   const { isLocked, isReady, chromeStorageService, setIsLocked } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
+  const hasRun = useRef(false);
+
   const {
     connectRequest,
     sendBsvRequest,
@@ -108,6 +112,35 @@ export const App = () => {
     }
   }, [transferOrdinalRequest, purchaseOrdinalRequest, menuContext]);
 
+  
+
+  useEffect(() => {
+    if (isReady && !isLocked && !hasRun.current) {
+      hasRun.current = true; // Set the flag to true to prevent future runs
+  
+      const loadSavedPage = async () => {
+        const savedPage = await chromeStorageService.getCurrentPage();
+        console.log({ savedPage });
+        if (savedPage && savedPage !== '/' && !location.pathname.startsWith('/connect')) {
+          navigate(savedPage);
+        }
+      };
+  
+      loadSavedPage();
+    }
+  }, [isReady, isLocked, chromeStorageService, navigate, location.pathname]);
+  
+  
+  
+  useEffect(() => {
+    if (isReady && !isLocked) {
+      const updatePageInfo = async () => {
+        await chromeStorageService.setCurrentPage(location.pathname);
+      };
+      updatePageInfo();
+    }
+  }, [isReady, isLocked, location.pathname, chromeStorageService]);
+  
   if (!isReady) {
     return (
       <MainContainer $isMobile={isMobile} theme={theme}>
@@ -117,148 +150,205 @@ export const App = () => {
   }
 
   return (
+    <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
+        <Routes>
+          <Route path="/" element={<Start />} />
+          <Route path="/create-wallet" element={<CreateAccount onNavigateBack={() => null} newWallet />} />
+          <Route path="/restore-wallet" element={<RestoreAccount onNavigateBack={() => null} newWallet />} />
+          <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
+          <Route path="/master-restore" element={<MasterRestore />} />
+          <Route
+            path="/connect"
+            element={
+              <ConnectRequest
+                request={connectRequest}
+                onDecision={() => clearRequest('connectRequest')}
+                whiteListedApps={whitelistedApps}
+                popupId={popupId}
+              />
+            }
+          />
+          <Route
+            path="/bsv-wallet"
+            element={
+              <Show
+                when={
+                  !sendBsvRequest &&
+                  !sendBsv20Request &&
+                  !signMessageRequest &&
+                  !broadcastRequest &&
+                  !getSignaturesRequest &&
+                  !generateTaggedKeysRequest &&
+                  !encryptRequest &&
+                  !decryptRequest
+                }
+                whenFalseContent={
+                  <>
+                    <Show when={!!sendBsvRequest}>
+                      <BsvSendRequest
+                        request={sendBsvRequest!}
+                        onResponse={() => clearRequest('sendBsvRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!sendBsv20Request}>
+                      <Bsv20SendRequest
+                        request={sendBsv20Request!}
+                        onResponse={() => clearRequest('sendBsv20Request')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!signMessageRequest}>
+                      <SignMessageRequest
+                        request={signMessageRequest!}
+                        onSignature={() => clearRequest('signMessageRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!broadcastRequest}>
+                      <BroadcastRequest
+                        request={broadcastRequest!}
+                        onBroadcast={() => clearRequest('broadcastRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!getSignaturesRequest}>
+                      <GetSignaturesRequest
+                        request={getSignaturesRequest!}
+                        onSignature={() => clearRequest('getSignaturesRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!generateTaggedKeysRequest}>
+                      <GenerateTaggedKeysRequest
+                        request={generateTaggedKeysRequest!}
+                        onResponse={() => clearRequest('generateTaggedKeysRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!encryptRequest}>
+                      <EncryptRequest
+                        request={encryptRequest!}
+                        onEncrypt={() => clearRequest('encryptRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!decryptRequest}>
+                      <DecryptRequest
+                        request={decryptRequest!}
+                        onDecrypt={() => clearRequest('decryptRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                  </>
+                }
+              >
+                <BsvWallet isOrdRequest={!!transferOrdinalRequest || !!purchaseOrdinalRequest} />
+              </Show>
+            }
+          />
+          <Route
+            path="/ord-wallet"
+            element={
+              <Show
+                when={!transferOrdinalRequest && !purchaseOrdinalRequest}
+                whenFalseContent={
+                  <>
+                    <Show when={!!purchaseOrdinalRequest}>
+                      <OrdPurchaseRequest
+                        request={purchaseOrdinalRequest!}
+                        onResponse={() => clearRequest('purchaseOrdinalRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                    <Show when={!!transferOrdinalRequest}>
+                      <OrdTransferRequest
+                        request={transferOrdinalRequest!}
+                        onResponse={() => clearRequest('transferOrdinalRequest')}
+                        popupId={popupId}
+                      />
+                    </Show>
+                  </>
+                }
+              >
+                <OrdWallet />
+              </Show>
+            }
+          />
+          <Route path="/tools" element={<AppsAndTools />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+    </Show>
+  );
+};
+
+export const App = () => {
+  const { isMobile } = useViewport();
+  const { theme } = useTheme();
+  const { isLocked, isReady, chromeStorageService, setIsLocked } = useServiceContext();
+  const menuContext = useContext(BottomMenuContext);
+
+  const {
+    connectRequest,
+    sendBsvRequest,
+    sendBsv20Request,
+    transferOrdinalRequest,
+    purchaseOrdinalRequest,
+    signMessageRequest,
+    broadcastRequest,
+    getSignaturesRequest,
+    generateTaggedKeysRequest,
+    encryptRequest,
+    decryptRequest,
+    clearRequest,
+    popupId,
+    getStorageAndSetRequestState,
+  } = useWeb3RequestContext();
+  const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
+
+  useEffect(() => {
+    if (isReady) {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      setWhitelistedApps(account?.settings?.whitelist ?? []);
+    }
+  }, [chromeStorageService, isReady]);
+
+  useActivityDetector(isLocked, isReady, chromeStorageService);
+
+  useEffect(() => {
+    isReady && getStorageAndSetRequestState(chromeStorageService);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
+
+  const handleUnlock = async () => {
+    setIsLocked(false);
+    menuContext?.handleSelect('bsv');
+  };
+
+  useEffect(() => {
+    if (transferOrdinalRequest || purchaseOrdinalRequest) {
+      menuContext?.handleSelect('ords');
+    }
+  }, [transferOrdinalRequest, purchaseOrdinalRequest, menuContext]);
+  if (!isReady) {
+    return (
+      <MainContainer $isMobile={isMobile} theme={theme}>
+        <PageLoader message="Loading..." theme={theme} />
+      </MainContainer>
+    );
+  }
+  return (
     <MainContainer $isMobile={isMobile} theme={theme}>
       <BlockHeightProvider>
         <QueueProvider>
           <BottomMenuProvider network={chromeStorageService.getNetwork()}>
             <Container theme={theme}>
-              <SnackbarProvider>
+              <SnackbarProvider>  
                 <QueueBanner />
                 <SyncingBlocks />
-                <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
-                  <Router>
-                    <Routes>
-                      <Route path="/" element={<Start />} />
-                      <Route path="/create-wallet" element={<CreateAccount onNavigateBack={() => null} newWallet />} />
-                      <Route
-                        path="/restore-wallet"
-                        element={<RestoreAccount onNavigateBack={() => null} newWallet />}
-                      />
-                      <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
-                      <Route path="/master-restore" element={<MasterRestore />} />
-                      <Route
-                        path="/connect"
-                        element={
-                          <ConnectRequest
-                            request={connectRequest}
-                            onDecision={() => clearRequest('connectRequest')}
-                            whiteListedApps={whitelistedApps}
-                            popupId={popupId}
-                          />
-                        }
-                      />
-                      <Route
-                        path="/bsv-wallet"
-                        element={
-                          <Show
-                            when={
-                              !sendBsvRequest &&
-                              !sendBsv20Request &&
-                              !signMessageRequest &&
-                              !broadcastRequest &&
-                              !getSignaturesRequest &&
-                              !generateTaggedKeysRequest &&
-                              !encryptRequest &&
-                              !decryptRequest
-                            }
-                            whenFalseContent={
-                              <>
-                                <Show when={!!sendBsvRequest}>
-                                  <BsvSendRequest
-                                    request={sendBsvRequest!}
-                                    onResponse={() => clearRequest('sendBsvRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!sendBsv20Request}>
-                                  <Bsv20SendRequest
-                                    request={sendBsv20Request!}
-                                    onResponse={() => clearRequest('sendBsv20Request')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!signMessageRequest}>
-                                  <SignMessageRequest
-                                    request={signMessageRequest!}
-                                    onSignature={() => clearRequest('signMessageRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!broadcastRequest}>
-                                  <BroadcastRequest
-                                    request={broadcastRequest!}
-                                    onBroadcast={() => clearRequest('broadcastRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!getSignaturesRequest}>
-                                  <GetSignaturesRequest
-                                    request={getSignaturesRequest!}
-                                    onSignature={() => clearRequest('getSignaturesRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!generateTaggedKeysRequest}>
-                                  <GenerateTaggedKeysRequest
-                                    request={generateTaggedKeysRequest!}
-                                    onResponse={() => clearRequest('generateTaggedKeysRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!encryptRequest}>
-                                  <EncryptRequest
-                                    request={encryptRequest!}
-                                    onEncrypt={() => clearRequest('encryptRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!decryptRequest}>
-                                  <DecryptRequest
-                                    request={decryptRequest!}
-                                    onDecrypt={() => clearRequest('decryptRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                              </>
-                            }
-                          >
-                            <BsvWallet isOrdRequest={!!transferOrdinalRequest || !!purchaseOrdinalRequest} />
-                          </Show>
-                        }
-                      />
-                      <Route
-                        path="/ord-wallet"
-                        element={
-                          <Show
-                            when={!transferOrdinalRequest && !purchaseOrdinalRequest}
-                            whenFalseContent={
-                              <>
-                                <Show when={!!purchaseOrdinalRequest}>
-                                  <OrdPurchaseRequest
-                                    request={purchaseOrdinalRequest!}
-                                    onResponse={() => clearRequest('purchaseOrdinalRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!transferOrdinalRequest}>
-                                  <OrdTransferRequest
-                                    request={transferOrdinalRequest!}
-                                    onResponse={() => clearRequest('transferOrdinalRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                              </>
-                            }
-                          >
-                            <OrdWallet />
-                          </Show>
-                        }
-                      />
-                      <Route path="/tools" element={<AppsAndTools />} />
-                      <Route path="/settings" element={<Settings />} />
-                    </Routes>
-                  </Router>
-                </Show>
+                <Router>
+                  <AppContent />
+                </Router>
               </SnackbarProvider>
             </Container>
           </BottomMenuProvider>
