@@ -80,7 +80,14 @@ export interface ChromeStorageObject {
   generateTaggedKeysRequest?: TaggedDerivationRequest;
   encryptRequest?: EncryptRequest;
   decryptRequest?: DecryptRequest;
-  currentPage?: string;
+  passwordFields?: {
+    [fieldId: string]: PasswordFieldState;
+  };
+}
+export interface PasswordFieldState {
+  value: string;
+  path: string;
+  timestamp: number;
 }
 
 export type CurrentAccountObject = Omit<

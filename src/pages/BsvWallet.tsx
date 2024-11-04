@@ -271,19 +271,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   useEffect(() => {
-    const loadSavedPageState = async () => {
-      const savedPage = await chromeStorageService.getCurrentPage();
-      setPageState(savedPage as PageState);
-    };
-
-    loadSavedPageState();
-  }, [chromeStorageService]);
-
-  useEffect(() => {
-    chromeStorageService.setCurrentPage(pageState);
-  }, [pageState, chromeStorageService]);
-
-  useEffect(() => {
     if (!bsv20s || !account) return;
     setFilteredTokens(bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id)));
   }, [bsv20s, account]);

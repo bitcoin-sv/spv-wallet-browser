@@ -5,12 +5,13 @@ import { useViewport } from '../hooks/useViewport';
 import { WhiteLabelTheme } from '../theme.types';
 import { sleep } from '../utils/sleep';
 import { Button } from './Button';
-import { Input } from './Input';
+// import { Input } from './Input';
 import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
 import { setDerivationTags } from '../services/serviceHelpers';
 import { Keys } from '../utils/keys';
+import { PasswordInput } from './PasswordInput';
 
 const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   display: flex;
@@ -70,15 +71,13 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       </HeaderText>
       <Text theme={theme}>Use password to unlock your wallet.</Text>
       <FormContainer onSubmit={handleUnlock}>
-        <Input
+        <PasswordInput
           theme={theme}
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          shake={verificationFailed ? 'true' : 'false'}
+          id="login-password"
+          placeholder="Enter your password"
+          onChange={(e) => setPassword(e)}
+          shake={verificationFailed ? true : false}
           autoFocus
-          onKeyDown={(e) => e.stopPropagation()}
         />
         <Button
           theme={theme}

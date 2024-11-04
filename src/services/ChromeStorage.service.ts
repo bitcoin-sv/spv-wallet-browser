@@ -14,11 +14,11 @@ import {
 import { decrypt } from '../utils/crypto';
 import { Keys } from '../utils/keys';
 import { deepMerge } from './serviceHelpers';
-import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
+import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage, PasswordFieldState } from './types/chromeStorage.types';
 
 export class ChromeStorageService {
   storage: Partial<ChromeStorageObject> | undefined;
-
+  
   private set = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       chrome.storage.local.set(obj, async () => {
@@ -339,12 +339,45 @@ export class ChromeStorageService {
     sendMessage({ action: YoursEventName.SWITCH_ACCOUNT });
   };
 
-  getCurrentPage = async (): Promise<string> => {
-    const result = await this.get(['currentPage']);
-    return result.currentPage || 'bsv-wallet';
+  savePasswordState = async (fieldId: string, value: string, path: string): Promise<void> => {
+    try {
+      const storage = await this.get(['passwordFields']);
+      const passwordFields = storage.passwordFields || {};
+      
+      passwordFields[fieldId] = {
+        value,
+        path,
+        timestamp: Date.now()
+      };
+
+      await this.updateNested('passwordFields', passwordFields);
+    } catch (error) {
+      throw new Error(`Failed to save password state: ${error}`);
+    }
   };
 
-  setCurrentPage = async (page: string): Promise<void> => {
-    await this.set({ currentPage: page });
+  getPasswordState = async (fieldId: string): Promise<PasswordFieldState | null> => {
+    try {
+      const storage = await this.get(['passwordFields']);
+      return storage.passwordFields?.[fieldId] || null;
+    } catch (error) {
+      throw new Error(`Failed to get password state: ${error}`);
+    }
+  };
+
+  clearPasswordState = async (fieldId: string): Promise<void> => {
+    try {
+      await this.removeNested('passwordFields', fieldId);
+    } catch (error) {
+      throw new Error(`Failed to clear password state: ${error}`);
+    }
+  };
+
+  clearAllPasswordStates = async (): Promise<void> => {
+    try {
+      await this.update({ passwordFields: {} });
+    } catch (error) {
+      throw new Error(`Failed to clear all password states: ${error}`);
+    }
   };
 }
